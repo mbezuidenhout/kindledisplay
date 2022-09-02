@@ -23,7 +23,7 @@ const (
 	Portrait
 )
 
-const kindle = false
+const kindle = true
 
 var (
 	AppConfig       Config
@@ -135,7 +135,7 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 
 	blockLayout := NewBlockLayout(len(AppConfig.Pages[PageNr].Blocks), PageOrientation)
 
-	urlregex := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)`)
+	urlregex := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)`)
 
 	kindlectx := gg.NewContext(blockLayout.Width, blockLayout.Height)
 	kindlectx.SetRGB(1, 1, 1)
