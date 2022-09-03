@@ -23,7 +23,7 @@ const (
 	Portrait
 )
 
-const kindle = true
+const kindle = false
 
 var (
 	AppConfig       Config

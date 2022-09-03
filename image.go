@@ -17,53 +17,39 @@ type Image struct {
 
 var cache map[string]Image = make(map[string]Image)
 
-func UrlImageFromCache(url string) image.Image {
-	if k, ok := cache[url]; ok {
-		if time.Now().Before(k.ValidTill) {
-			return k.Image
-		}
-		go func() {
-			res, err := http.Get(url)
-			if err != nil || res.StatusCode != 200 {
-				fmt.Printf("Could not get image from %s\n", url)
-				return
-			}
-			defer res.Body.Close()
-			src, _, err := image.Decode(res.Body)
-			if err != nil {
-				fmt.Printf("Could not decode %s as an image\n", url)
-				return
-			}
-			if _, ok := cache[url]; !ok {
-				cache[url] = Image{Image: src, ValidTill: time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))}
-			}
-			val := cache[url]
-			val.ValidTill = time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))
-			val.Image = src
-
-		}()
-		return k.Image
-	}
-
+func fetchFromURL(url string) {
 	res, err := http.Get(url)
 	if err != nil || res.StatusCode != 200 {
 		fmt.Printf("Could not get image from %s\n", url)
-		return image.NewGray(image.Rect(0, 0, 0, 0))
+		return
 	}
 	defer res.Body.Close()
 	src, _, err := image.Decode(res.Body)
 	if err != nil {
 		fmt.Printf("Could not decode %s as an image\n", url)
-		return image.NewGray(image.Rect(0, 0, 0, 0))
+		return
 	}
 	if _, ok := cache[url]; !ok {
 		cache[url] = Image{Image: src, ValidTill: time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))}
 	}
-	val := cache[url]
+	var val Image
 	val.ValidTill = time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))
 	val.Image = src
+	cache[url] = val
+}
 
-	return val.Image
+func UrlImageFromCache(url string) image.Image {
+	if k, ok := cache[url]; ok {
+		if time.Now().Before(k.ValidTill) {
+			return k.Image
+		}
+		go fetchFromURL(url)
+		return k.Image
+	}
+
+	fetchFromURL(url)
+
+	return cache[url].Image
 }
 
 func DrawFromURL(ctx *gg.Context, x, y, width, height int, url string) {
