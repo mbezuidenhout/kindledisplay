@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
+	"io"
 	"net/http"
 	"time"
 
@@ -11,7 +13,7 @@ import (
 )
 
 type Image struct {
-	Image     image.Image
+	HttpBody  []byte
 	ValidTill time.Time
 }
 
@@ -24,38 +26,52 @@ func fetchFromURL(url string) {
 		return
 	}
 	defer res.Body.Close()
-	src, _, err := image.Decode(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		fmt.Printf("Could not decode %s as an image\n", url)
 		return
 	}
 	if _, ok := cache[url]; !ok {
-		cache[url] = Image{Image: src, ValidTill: time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))}
+		cache[url] = Image{HttpBody: body, ValidTill: time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))}
 	}
 	var val Image
 	val.ValidTill = time.Now().Add(time.Duration(time.Second * time.Duration(AppConfig.CacheTimeout)))
-	val.Image = src
+	val.HttpBody = body
 	cache[url] = val
 }
 
 func UrlImageFromCache(url string) image.Image {
 	if k, ok := cache[url]; ok {
 		if time.Now().Before(k.ValidTill) {
-			return k.Image
+			src, _, err := image.Decode(bytes.NewReader(k.HttpBody))
+			if err != nil {
+				fmt.Printf("Could not decode %s as an image\n", url)
+				return nil
+			}
+			return src
 		}
 		go fetchFromURL(url)
-		return k.Image
+		src, _, err := image.Decode(bytes.NewReader(k.HttpBody))
+		if err != nil {
+			fmt.Printf("Could not decode %s as an image\n", url)
+			return nil
+		}
+		return src
 	}
 
 	fetchFromURL(url)
-
-	return cache[url].Image
+	src, _, err := image.Decode(bytes.NewReader(cache[url].HttpBody))
+	if err != nil {
+		fmt.Printf("Could not decode %s as an image\n", url)
+		return nil
+	}
+	return src
 }
 
 func DrawFromURL(ctx *gg.Context, x, y, width, height int, url string) {
 	src := UrlImageFromCache(url)
-
-	dst := image.NewGray(image.Rect(0, 0, width, height))
-	draw.NearestNeighbor.Scale(dst, dst.Rect, src, src.Bounds(), draw.Over, nil)
-	ctx.DrawImage(dst, x, y)
+	if src != nil {
+		dst := image.NewGray(image.Rect(0, 0, width, height))
+		draw.NearestNeighbor.Scale(dst, dst.Rect, src, src.Bounds(), draw.Over, nil)
+		ctx.DrawImage(dst, x, y)
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -105,6 +106,9 @@ func main() {
 			minuteNow := t.Minute()
 			if minuteOld != minuteNow {
 				minuteOld = minuteNow
+				if minuteNow == 0 {
+					debug.FreeOSMemory()
+				}
 				pageRefresh(Page, PageOrientation)
 				break
 			}
