@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"os/exec"
 	"os/signal"
 	"regexp"
-	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -24,12 +24,14 @@ const (
 	Portrait
 )
 
-const kindle = false
+const kindle = true
 
 var (
 	AppConfig       Config
 	Page            int         = 0
 	PageOrientation Orientation = Portrait
+	fb              *kindleland.FrameBuffer
+	err             error
 )
 
 func main() {
@@ -45,6 +47,13 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
+	}
+
+	if kindle {
+		fb, err = kindleland.NewFrameBuffer("/dev/fb0", 600, 800)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if strings.Compare(strings.ToLower(AppConfig.Orientation), "landscape") == 0 {
@@ -99,6 +108,7 @@ func main() {
 	intervalTimer := 0
 
 	minuteOld := -1
+	triedWifiReconnect := false
 	for {
 		t := time.Now()
 		select {
@@ -106,11 +116,15 @@ func main() {
 			minuteNow := t.Minute()
 			if minuteOld != minuteNow {
 				minuteOld = minuteNow
-				if minuteNow == 0 {
-					debug.FreeOSMemory()
-				}
 				pageRefresh(Page, PageOrientation)
 				break
+			}
+			// Attempt to reconnect to WiFi once every 5 minutes
+			if minuteNow%5 == 0 && !triedWifiReconnect {
+				triedWifiReconnect = true
+				exec.Command("/usr/bin/wpa_cli -i wlan0 reconnect")
+			} else if minuteNow%5 != 0 {
+				triedWifiReconnect = false
 			}
 			if AppConfig.Interval > 0 {
 				intervalTimer++
@@ -119,6 +133,9 @@ func main() {
 					Page++
 					if Page >= len(AppConfig.Pages) {
 						Page = 0
+						if kindle {
+							fb.ClearScreen()
+						}
 					}
 					pageRefresh(Page, PageOrientation)
 					break
@@ -159,11 +176,6 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 	}
 
 	if kindle {
-		fb, err := kindleland.NewFrameBuffer("/dev/fb0", 600, 800)
-		if err != nil {
-			panic(err)
-		}
-
 		var rotatedImage image.Image
 
 		if PageOrientation == Landscape {
