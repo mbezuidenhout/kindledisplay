@@ -16,6 +16,7 @@ type Config struct {
 	Interval     int     `yaml:"interval"`
 	CacheTimeout int     `yaml:"cachetimeout"`
 	Orientation  string  `yaml:"orientation"`
+	TimeZone     string  `yaml:"timezone"`
 }
 
 var (

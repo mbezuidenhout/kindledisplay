@@ -8,6 +8,7 @@
 orientation: landscape
 interval: 10
 cachetimeout: 120
+timezone: Africa/Johannesburg
 pages:
     - Page1:
       - time

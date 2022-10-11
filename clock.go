@@ -31,7 +31,11 @@ func getFontSize(ctx *gg.Context, width int) int {
 
 func DrawTimeFormat(format string, ctx *gg.Context, x, y, width, height int) (w, h float64) {
 	t := time.Now()
-	timeString := t.Format(format)
+	tz, err := time.LoadLocation(AppConfig.TimeZone)
+	if err != nil { // Always check errors even if they should not happen.
+		panic(err)
+	}
+	timeString := t.In(tz).Format(format)
 	font, err := truetype.Parse(goregular.TTF)
 	if err != nil {
 		panic(err)

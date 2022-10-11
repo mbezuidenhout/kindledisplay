@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"os/exec"
 	"os/signal"
 	"regexp"
 	"strings"
@@ -108,7 +107,7 @@ func main() {
 	intervalTimer := 0
 
 	minuteOld := -1
-	triedWifiReconnect := false
+	//triedWifiReconnect := false
 	for {
 		t := time.Now()
 		select {
@@ -120,12 +119,12 @@ func main() {
 				break
 			}
 			// Attempt to reconnect to WiFi once every 5 minutes
-			if minuteNow%5 == 0 && !triedWifiReconnect {
-				triedWifiReconnect = true
-				exec.Command("/usr/bin/wpa_cli -i wlan0 reconnect")
-			} else if minuteNow%5 != 0 {
-				triedWifiReconnect = false
-			}
+			//if minuteNow%5 == 0 && !triedWifiReconnect {
+			//	triedWifiReconnect = true
+			//	exec.Command("/usr/bin/wpa_cli -i wlan0 reconnect")
+			//} else if minuteNow%5 != 0 {
+			//	triedWifiReconnect = false
+			//}
 			if AppConfig.Interval > 0 {
 				intervalTimer++
 				if intervalTimer > AppConfig.Interval*4 { // Tick happens every 250ms
