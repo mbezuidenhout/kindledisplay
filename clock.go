@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+	_ "time/tzdata"
 
 	"github.com/fogleman/gg"
 	"github.com/golang/freetype/truetype"
