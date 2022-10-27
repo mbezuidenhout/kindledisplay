@@ -1,5 +1,6 @@
 # config.yml
 # Orientation can be either landscape or portrait
+# Specify the device's default network interface
 # Pages can contain between one and four array items
 # Page flip interval in seconds
 # URL image cachetimeout in seconds
@@ -9,6 +10,7 @@ orientation: landscape
 interval: 10
 cachetimeout: 120
 timezone: Africa/Johannesburg
+interface: wlan0
 pages:
     - Page1:
       - time

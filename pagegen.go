@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"net"
 	"os"
 	"os/signal"
 	"regexp"
@@ -13,7 +14,10 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
 	"github.com/mbezuidenhout/kindleland"
+	"golang.org/x/exp/shiny/iconvg"
+	"golang.org/x/exp/shiny/materialdesign/icons"
 	"golang.org/x/exp/slices"
+	"golang.org/x/image/draw"
 )
 
 type Orientation int
@@ -23,7 +27,7 @@ const (
 	Portrait
 )
 
-const kindle = true
+const kindle = false
 
 var (
 	AppConfig       Config
@@ -53,6 +57,13 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+	}
+
+	_, err = net.InterfaceByName(AppConfig.Interface)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Interface '"+AppConfig.Interface+"' not found.")
+		panic(err)
 	}
 
 	if strings.Compare(strings.ToLower(AppConfig.Orientation), "landscape") == 0 {
@@ -172,6 +183,21 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 		} else {
 			fmt.Printf("Block %d did not match a known format\n", i)
 		}
+	}
+
+	// Ignoring the error because it should have been handled in main()
+	byNameInterface, _ := net.InterfaceByName(AppConfig.Interface)
+
+	if !strings.Contains(byNameInterface.Flags.String(), "up") {
+		wifiOff := image.NewAlpha(image.Rect(0, 0, 40, 40))
+		var z iconvg.Rasterizer
+		z.SetDstImage(wifiOff, wifiOff.Bounds(), draw.Src)
+		if err := iconvg.Decode(&z, icons.DeviceSignalWiFiOff, nil); err != nil {
+			panic(err)
+		}
+		invertedWifiOff := imaging.Invert(wifiOff)
+
+		kindlectx.DrawImage(invertedWifiOff, blockLayout.Width-40, 0)
 	}
 
 	if kindle {
