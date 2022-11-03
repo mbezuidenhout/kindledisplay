@@ -49,7 +49,7 @@ func NewBlockLayout(nrOfBlocks int, PageOrientation Orientation) *Blocks {
 	if PageOrientation == Landscape {
 		b.Width = 800
 		b.Height = 600
-		for k, _ := range b.Blocks {
+		for k := range b.Blocks {
 			height := b.Blocks[k].Height
 			b.Blocks[k].Height = b.Blocks[k].Width
 			b.Blocks[k].Width = height

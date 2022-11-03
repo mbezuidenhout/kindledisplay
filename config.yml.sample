@@ -10,6 +10,9 @@ orientation: landscape
 interval: 10
 cachetimeout: 120
 timezone: Africa/Johannesburg
+latitude: -23.545570
+longitude: -46.704082
+elevation: 1380
 interface: wlan0
 pages:
     - Page1:

@@ -18,6 +18,9 @@ type Config struct {
 	Orientation  string  `yaml:"orientation"`
 	TimeZone     string  `yaml:"timezone"`
 	Interface    string  `yaml:"interface"`
+	Latitude     float32 `yaml:"latitude"`
+	Longitude    float32 `yaml:"longitude"`
+	Elevation    int     `yaml:"elevation"`
 }
 
 var (

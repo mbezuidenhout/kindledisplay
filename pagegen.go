@@ -5,6 +5,7 @@ import (
 	"image"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"regexp"
 	"strings"
@@ -27,14 +28,15 @@ const (
 	Portrait
 )
 
-const kindle = false
+const kindle = true
 
 var (
 	AppConfig       Config
 	Page            int         = 0
 	PageOrientation Orientation = Portrait
+	LinkDown        bool        = false
+	lastReconnect   time.Time
 	fb              *kindleland.FrameBuffer
-	err             error
 )
 
 func main() {
@@ -118,7 +120,6 @@ func main() {
 	intervalTimer := 0
 
 	minuteOld := -1
-	//triedWifiReconnect := false
 	for {
 		t := time.Now()
 		select {
@@ -127,15 +128,12 @@ func main() {
 			if minuteOld != minuteNow {
 				minuteOld = minuteNow
 				pageRefresh(Page, PageOrientation)
+				if LinkDown && lastReconnect.Add(time.Duration(time.Minute*5)).Before(time.Now()) {
+					lastReconnect = time.Now()
+					exec.Command(fmt.Sprintf("/usr/bin/wpa_cli -i %s reconnect", AppConfig.Interface))
+				}
 				break
 			}
-			// Attempt to reconnect to WiFi once every 5 minutes
-			//if minuteNow%5 == 0 && !triedWifiReconnect {
-			//	triedWifiReconnect = true
-			//	exec.Command("/usr/bin/wpa_cli -i wlan0 reconnect")
-			//} else if minuteNow%5 != 0 {
-			//	triedWifiReconnect = false
-			//}
 			if AppConfig.Interval > 0 {
 				intervalTimer++
 				if intervalTimer > AppConfig.Interval*4 { // Tick happens every 250ms
@@ -147,6 +145,16 @@ func main() {
 							fb.ClearScreen()
 						}
 					}
+					// Ignoring the error because it should have been handled in on startup in main()
+					defaultInterface, _ := net.InterfaceByName(AppConfig.Interface)
+					addrs, err := defaultInterface.Addrs()
+
+					if err != nil || len(addrs) < 1 || !strings.Contains(defaultInterface.Flags.String(), "up") {
+						LinkDown = true
+					} else {
+						LinkDown = false
+					}
+
 					pageRefresh(Page, PageOrientation)
 					break
 				}
@@ -172,23 +180,23 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 	kindlectx.SetRGB(1, 1, 1)
 	kindlectx.Clear()
 	for i, element := range AppConfig.Pages[PageNr].Blocks {
-		if strings.Compare(strings.ToLower(element), "time") == 0 {
+		switch {
+		case strings.Compare(strings.ToLower(element), "time") == 0:
 			DrawTime(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
-		} else if strings.Compare(strings.ToLower(element), "datetime") == 0 {
+		case strings.Compare(strings.ToLower(element), "datetime") == 0:
 			DrawDateTime(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
-		} else if strings.Compare(strings.ToLower(element), "date") == 0 {
+		case strings.Compare(strings.ToLower(element), "date") == 0:
 			DrawDate(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
-		} else if urlregex.MatchString(element) {
+		case strings.Compare(strings.ToLower(element), "sun") == 0:
+			DrawSun(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
+		case urlregex.MatchString(element):
 			DrawFromURL(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height, element)
-		} else {
+		default:
 			fmt.Printf("Block %d did not match a known format\n", i)
 		}
 	}
 
-	// Ignoring the error because it should have been handled in main()
-	byNameInterface, _ := net.InterfaceByName(AppConfig.Interface)
-
-	if !strings.Contains(byNameInterface.Flags.String(), "up") {
+	if LinkDown {
 		wifiOff := image.NewAlpha(image.Rect(0, 0, 40, 40))
 		var z iconvg.Rasterizer
 		z.SetDstImage(wifiOff, wifiOff.Bounds(), draw.Src)
@@ -209,7 +217,7 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 			rotatedImage = kindlectx.Image()
 		}
 
-		err = fb.ApplyImage(rotatedImage)
+		err := fb.ApplyImage(rotatedImage)
 		if err != nil {
 			panic(err)
 		}
