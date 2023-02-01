@@ -17,10 +17,10 @@ type Config struct {
 	CacheTimeout int     `yaml:"cachetimeout"`
 	Orientation  string  `yaml:"orientation"`
 	TimeZone     string  `yaml:"timezone"`
-	Interface    string  `yaml:"interface"`
-	Latitude     float32 `yaml:"latitude"`
-	Longitude    float32 `yaml:"longitude"`
-	Elevation    int     `yaml:"elevation"`
+	Interface    string  `yaml:"interface,omitempty"`
+	Latitude     float32 `yaml:"latitude,omitempty"`
+	Longitude    float32 `yaml:"longitude,omitempty"`
+	Elevation    int     `yaml:"elevation,omitempty"`
 }
 
 var (

@@ -35,8 +35,8 @@ var (
 	Page            int         = 0
 	PageOrientation Orientation = Portrait
 	LinkDown        bool        = false
-	lastReconnect   time.Time
-	fb              *kindleland.FrameBuffer
+	//lastReconnect   time.Time
+	fb *kindleland.FrameBuffer
 )
 
 func main() {
@@ -61,11 +61,21 @@ func main() {
 		}
 	}
 
-	_, err = net.InterfaceByName(AppConfig.Interface)
+	if len(AppConfig.Interface) > 0 {
+		_, err = net.InterfaceByName(AppConfig.Interface)
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Interface '"+AppConfig.Interface+"' not found.")
-		panic(err)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Interface '"+AppConfig.Interface+"' not found.")
+			panic(err)
+		}
+	}
+
+	if kindle {
+		// Shutdown the kindle framework and powerd
+		cmd := exec.Command("/etc/init.d/powerd", "stop")
+		cmd.Run()
+		cmd = exec.Command("/etc/init.d/framework", "stop")
+		cmd.Run()
 	}
 
 	if strings.Compare(strings.ToLower(AppConfig.Orientation), "landscape") == 0 {
@@ -120,6 +130,7 @@ func main() {
 	intervalTimer := 0
 
 	minuteOld := -1
+	wifiOff := false
 	for {
 		t := time.Now()
 		select {
@@ -128,9 +139,25 @@ func main() {
 			if minuteOld != minuteNow {
 				minuteOld = minuteNow
 				pageRefresh(Page, PageOrientation)
-				if LinkDown && lastReconnect.Add(time.Duration(time.Minute*5)).Before(time.Now()) {
-					lastReconnect = time.Now()
-					exec.Command(fmt.Sprintf("/usr/bin/wpa_cli -i %s reconnect", AppConfig.Interface))
+				if LinkDown { // && !wifiOff { // && lastReconnect.Add(time.Duration(time.Minute*5)).Before(time.Now()) {
+					//lastReconnect = time.Now()
+					//exec.Command(fmt.Sprintf("/usr/bin/wpa_cli -i %s disconnect", AppConfig.Interface))
+					//cmd := exec.Command("/sbin/udhcpc", "-i", AppConfig.Interface, "reconnect")
+					//cmd.Run()
+					if !wifiOff {
+						cmd := exec.Command("/etc/init.d/wifid", "stop")
+						cmd.Run()
+						wifiOff = true
+					} else {
+						cmd := exec.Command("/etc/init.d/wifid", "start")
+						cmd.Run()
+						cmd = exec.Command("/etc/init.d/wpa_supplicant", "restart")
+						cmd.Run()
+						wifiOff = false
+					}
+
+					//cmd := exec.Command("/etc/init.d/wpa_supplicant", "restart")
+					//cmd.Run()
 				}
 				break
 			}
@@ -145,14 +172,16 @@ func main() {
 							fb.ClearScreen()
 						}
 					}
-					// Ignoring the error because it should have been handled in on startup in main()
-					defaultInterface, _ := net.InterfaceByName(AppConfig.Interface)
-					addrs, err := defaultInterface.Addrs()
+					if len(AppConfig.Interface) > 0 {
+						// Ignoring the error because it should have been handled in on startup in main()
+						defaultInterface, _ := net.InterfaceByName(AppConfig.Interface)
+						addrs, err := defaultInterface.Addrs()
 
-					if err != nil || len(addrs) < 1 || !strings.Contains(defaultInterface.Flags.String(), "up") {
-						LinkDown = true
-					} else {
-						LinkDown = false
+						if err != nil || len(addrs) < 1 || (defaultInterface.Flags&net.FlagUp == 0) {
+							LinkDown = true
+						} else {
+							LinkDown = false
+						}
 					}
 
 					pageRefresh(Page, PageOrientation)
@@ -162,6 +191,15 @@ func main() {
 		case <-done:
 			fmt.Println("Received done")
 			ticker.Stop()
+
+			if kindle {
+				// Start the kindle framework and powerd
+				cmd := exec.Command("/etc/init.d/powerd", "start")
+				cmd.Run()
+				cmd = exec.Command("/etc/init.d/framework", "start")
+				cmd.Run()
+			}
+
 			return
 		}
 	}
@@ -188,11 +226,15 @@ func pageRefresh(PageNr int, PageOrientation Orientation) {
 		case strings.Compare(strings.ToLower(element), "date") == 0:
 			DrawDate(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
 		case strings.Compare(strings.ToLower(element), "sun") == 0:
-			DrawSun(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
+			if AppConfig.Latitude == 0 && AppConfig.Longitude == 0 {
+				fmt.Println("latitude and longitude must be set to use block type \"sun\"")
+			} else {
+				DrawSun(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height)
+			}
 		case urlregex.MatchString(element):
 			DrawFromURL(kindlectx, blockLayout.Blocks[i].X, blockLayout.Blocks[i].Y, blockLayout.Blocks[i].Width, blockLayout.Blocks[i].Height, element)
 		default:
-			fmt.Printf("Block %d did not match a known format\n", i)
+			fmt.Printf("Block %d did not match a known format\nBlock types include time, datetime, date, sun and URL to an image", i)
 		}
 	}
 
